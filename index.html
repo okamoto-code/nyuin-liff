@@ -1,0 +1,523 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex, nofollow">
+<title>入退院登録</title>
+<style>
+:root {
+  --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --sub: #5d6676; --line: #dde1e8;
+  --accent: #0a8f4d; --accent-t: #ffffff; --accent-soft: #e4f5ec;
+  --warn: #b45309; --warn-soft: #fff3df; --err: #b42318; --err-soft: #fdeceb;
+  --shadow: 0 1px 2px rgba(0,0,0,.06);
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #14171d; --card: #1e232c; --text: #eef0f4; --sub: #a3acba; --line: #333a46;
+    --accent: #2fc27a; --accent-t: #07210f; --accent-soft: #163626;
+    --warn: #f0b35a; --warn-soft: #3a2c14; --err: #ff8a80; --err-soft: #3b1d1b;
+    --shadow: none;
+  }
+}
+* { box-sizing: border-box; }
+html, body { margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans JP", "Yu Gothic", sans-serif;
+  -webkit-text-size-adjust: 100%; }
+#app { max-width: 560px; margin: 0 auto; padding: 0 16px calc(96px + env(safe-area-inset-bottom)); min-height: 100vh; }
+header { display: flex; align-items: center; justify-content: space-between; padding: 14px 0 10px; gap: 8px; }
+header h1 { font-size: 18px; margin: 0; }
+header .who { font-size: 13px; color: var(--sub); text-align: right; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; margin: 10px 0; box-shadow: var(--shadow); }
+.card h2 { font-size: 15px; margin: 0 0 8px; }
+.sub { color: var(--sub); font-size: 13px; }
+.row { display: flex; gap: 8px; align-items: center; }
+.row > * { min-width: 0; }
+.grow { flex: 1; }
+button { font: inherit; border: 1px solid var(--line); background: var(--card); color: var(--text); border-radius: 12px;
+  padding: 12px 14px; min-height: 48px; cursor: pointer; }
+button:active { transform: scale(.985); }
+button:disabled { opacity: .5; cursor: default; }
+button.primary { background: var(--accent); color: var(--accent-t); border-color: var(--accent); font-weight: 700; }
+button.big { width: 100%; min-height: 64px; font-size: 18px; text-align: left; padding: 14px 16px; display: flex; align-items: center; justify-content: space-between; margin: 10px 0; }
+button.big small { font-size: 13px; font-weight: 400; opacity: .85; }
+button.link { border: none; background: none; color: var(--accent); padding: 8px 4px; min-height: 40px; text-decoration: underline; }
+button.chip { min-height: 40px; padding: 6px 12px; border-radius: 999px; font-size: 14px; }
+button.chip.on { background: var(--accent-soft); border-color: var(--accent); }
+input, textarea, select { font: inherit; width: 100%; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--text); min-height: 48px; }
+textarea { min-height: 84px; resize: vertical; }
+label.f { display: block; font-size: 13px; color: var(--sub); margin: 12px 0 4px; }
+.item { display: block; width: 100%; text-align: left; padding: 12px; margin: 8px 0; border-radius: 12px; border: 1px solid var(--line); background: var(--card); }
+.item .n { font-weight: 700; font-size: 17px; }
+.item .m { font-size: 13px; color: var(--sub); }
+.badge { display: inline-block; font-size: 12px; padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent); margin-left: 6px; font-weight: 600; vertical-align: 1px; }
+.badge.warn { background: var(--warn-soft); color: var(--warn); }
+.badge.gray { background: var(--line); color: var(--sub); }
+.msg { padding: 12px; border-radius: 12px; margin: 10px 0; }
+.msg.err { background: var(--err-soft); color: var(--err); }
+.msg.warn { background: var(--warn-soft); color: var(--warn); }
+.msg.ok { background: var(--accent-soft); color: var(--accent); }
+.bar { position: fixed; left: 0; right: 0; bottom: 0; background: var(--bg); border-top: 1px solid var(--line); padding: 10px 16px calc(10px + env(safe-area-inset-bottom)); }
+.bar .in { max-width: 560px; margin: 0 auto; display: flex; gap: 8px; }
+.bar button { flex: 1; }
+.center { text-align: center; padding: 48px 0; }
+.spin { width: 28px; height: 28px; border: 3px solid var(--line); border-top-color: var(--accent); border-radius: 50%; animation: sp 0.9s linear infinite; margin: 0 auto 12px; }
+@keyframes sp { to { transform: rotate(360deg); } }
+.sel { border: 2px solid var(--accent); background: var(--accent-soft); }
+.kv { display: grid; grid-template-columns: 5.5em 1fr; gap: 4px 8px; font-size: 15px; }
+.kv { margin: 0; }
+.kv dt { color: var(--sub); } .kv dd { margin: 0; word-break: break-all; white-space: pre-wrap; }
+footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0; }
+.mock { background: var(--warn-soft); color: var(--warn); text-align: center; font-size: 12px; padding: 4px; }
+</style>
+</head>
+<body>
+<div id="mockbar" class="mock" hidden>試験用の表示です（実際には登録されません）</div>
+<div id="app"><div class="center"><div class="spin"></div>LINE に接続しています…</div></div>
+
+<script src="config.js"></script>
+<script>
+(function () {
+  'use strict';
+  var CFG = window.APP_CONFIG || {};
+  var VERSION = 'v1.0';
+  var app = document.getElementById('app');
+
+  /* ---------- 小さな道具 ---------- */
+  function el(tag, attrs, kids) {
+    var e = document.createElement(tag);
+    if (attrs) Object.keys(attrs).forEach(function (k) {
+      if (k === 'class') e.className = attrs[k];
+      else if (k === 'text') e.textContent = attrs[k];
+      else if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), attrs[k]);
+      else if (attrs[k] === true) e.setAttribute(k, '');
+      else if (attrs[k] !== false && attrs[k] != null) e.setAttribute(k, attrs[k]);
+    });
+    (kids || []).forEach(function (c) { if (c != null) e.appendChild(typeof c === 'string' ? document.createTextNode(c) : c); });
+    return e;
+  }
+  function pad2(n) { return ('0' + n).slice(-2); }
+  function ymd(d) { return d.getFullYear() + '/' + pad2(d.getMonth() + 1) + '/' + pad2(d.getDate()); }
+  function shift(n) { var d = new Date(); d.setDate(d.getDate() + n); return ymd(d); }
+  function toIso(s) { return s.replace(/\//g, '-'); }
+  function fromIso(s) { return s.replace(/-/g, '/'); }
+  function shortDate(s) { var m = /^\d{4}\/(\d{2})\/(\d{2})$/.exec(s || ''); return m ? (+m[1]) + '/' + (+m[2]) : (s || ''); }
+  function rid() {
+    var a = new Uint8Array(8);
+    (window.crypto || window.msCrypto).getRandomValues(a);
+    return Array.prototype.map.call(a, function (b) { return ('0' + b.toString(16)).slice(-2); }).join('');
+  }
+  function mount(nodes) {
+    app.textContent = '';
+    nodes.forEach(function (n) { if (n) app.appendChild(n); });
+    window.scrollTo(0, 0);
+  }
+  function busy(text) {
+    mount([el('div', { class: 'center' }, [el('div', { class: 'spin' }), text || '読み込んでいます…'])]);
+  }
+  function header(title) {
+    return el('header', null, [
+      el('h1', { text: title }),
+      state.me ? el('div', { class: 'who' }, [state.me.name || '', el('br'), state.me.role || '']) : null
+    ]);
+  }
+  function bar(buttons) {
+    return el('div', { class: 'bar' }, [el('div', { class: 'in' }, buttons)]);
+  }
+  function footer() { return el('footer', { text: '入退院登録 ' + VERSION }); }
+
+  /* ---------- 検索のための文字そろえ ---------- */
+  function norm(s) {
+    s = String(s || '').normalize('NFKC').toLowerCase().replace(/[\s　]+/g, '');
+    return s.replace(/[ぁ-ゖ]/g, function (c) { return String.fromCharCode(c.charCodeAt(0) + 0x60); }); // ひらがな→カタカナ
+  }
+
+  /* ---------- 通信 ---------- */
+  var state = { me: null, master: null, index: null, idToken: null, view: 'home' };
+  var api = null;      // LIFF 版 or 試験用
+
+  function realApi() {
+    return function (a, body) {
+      var payload = Object.assign({ a: a, idToken: state.idToken, env: CFG.ENV || 'prod' }, body || {});
+      return fetch(CFG.API_URL, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(payload) })
+        .then(function (r) { return r.json(); })
+        .catch(function () { return { ok: false, code: 'network', message: '通信できませんでした。電波の良い所でもう一度お試しください' }; });
+    };
+  }
+
+  function call(a, body) {
+    return api(a, body).then(function (r) {
+      if (r && r.ok === false && r.code === 'auth') return reloginScreen(r.message);
+      return r;
+    });
+  }
+
+  function reloginScreen(message) {
+    mount([header('入退院登録'), el('div', { class: 'msg warn', text: message || 'LINE のログインの有効期限が切れました。' }),
+      el('button', { class: 'primary big', onclick: function () { try { liff.logout(); } catch (e) { } if (window.liff) liff.login({ redirectUri: location.href }); else location.reload(); } }, ['もう一度ログインする'])]);
+    return new Promise(function () { });   // 以降の処理を止める
+  }
+
+  /* ---------- 起動 ---------- */
+  function start() {
+    var p;
+    if (CFG.MOCK) {
+      document.getElementById('mockbar').hidden = false;
+      p = window.__mockInit();
+    } else {
+      p = loadLiff().then(function () {
+        return liff.init({ liffId: CFG.LIFF_ID });
+      }).then(function () {
+        if (!liff.isLoggedIn()) { liff.login({ redirectUri: location.href }); return new Promise(function () { }); }
+        state.idToken = liff.getIDToken();
+        api = realApi();
+      });
+    }
+    p.then(function () { return call('me'); }).then(function (me) {
+      if (!me || me.ok === false) return fatal(me && me.message);
+      route(me);
+    }).catch(function (e) { fatal(e && e.message); });
+  }
+
+  function loadLiff() {
+    return new Promise(function (resolve, reject) {
+      var s = document.createElement('script');
+      s.src = 'https://static.line-scdn.net/liff/edge/2/sdk.js';
+      s.onload = resolve;
+      s.onerror = function () { reject(new Error('LINE の部品を読み込めませんでした。通信を確認してください')); };
+      document.head.appendChild(s);
+    });
+  }
+
+  function fatal(msg) {
+    mount([header('入退院登録'), el('div', { class: 'msg err', text: msg || 'うまく開けませんでした。' }),
+      el('button', { class: 'big', onclick: function () { location.reload(); } }, ['もう一度開く'])]);
+  }
+
+  function route(me) {
+    if (me.status === 'unbound') { state.me = null; return screenApply(me); }
+    if (me.status === 'pending') { state.me = null; return screenPending(me); }
+    if (me.status !== 'ok') { state.me = null; return mount([header('入退院登録'), el('div', { class: 'msg err', text: 'この LINE では利用できません。事務に連絡してください。' }), footer()]); }
+    state.me = { name: me.name, role: me.role };
+    var q = new URLSearchParams(location.search);
+    var v = q.get('view');
+    var st = q.get('liff.state');
+    if (!v && st) { try { v = new URLSearchParams(st.replace(/^\//, '').replace(/^\?/, '')).get('view'); } catch (e) { } }
+    if (v === 'in') return screenNyuin();
+    if (v === 'active' || v === 'discharge') return screenActive();
+    if (v === 'inbox' && isOffice()) return screenInbox();
+    screenHome();
+  }
+  function isOffice() { return state.me && (state.me.role === '事務' || state.me.role === '管理'); }
+
+  /* ---------- 初めての方：利用申請 ---------- */
+  function screenApply(me) {
+    var name = el('input', { type: 'text', placeholder: '例：三木', autocomplete: 'off', maxlength: '30' });
+    var role = '営業';
+    var chips = ['営業', '事務'].map(function (r) {
+      return el('button', { class: 'chip' + (r === role ? ' on' : ''), type: 'button', onclick: function () {
+        role = r; chips.forEach(function (c) { c.className = 'chip' + (c.textContent === role ? ' on' : ''); });
+      } }, [r]);
+    });
+    var err = el('div');
+    mount([header('はじめての方'),
+      el('div', { class: 'card' }, [
+        el('h2', { text: '利用の申請' }),
+        el('div', { class: 'sub', text: 'お名前を入力して申請してください。承認されると使えるようになります。' }),
+        el('label', { class: 'f', text: 'お名前（姓だけで構いません）' }), name,
+        el('label', { class: 'f', text: '区分' }), el('div', { class: 'row' }, chips),
+        err]),
+      bar([el('button', { class: 'primary', onclick: function (ev) {
+        var n = name.value.trim();
+        err.textContent = '';
+        if (!n) { err.className = 'msg err'; err.textContent = 'お名前を入力してください'; return; }
+        ev.target.disabled = true;
+        call('apply', { name: n, role: role }).then(function (r) {
+          if (r.ok) return screenPending(r);
+          ev.target.disabled = false; err.className = 'msg err'; err.textContent = r.message || '申請できませんでした';
+        });
+      } }, ['申請する'])]), footer()]);
+  }
+
+  function screenPending(me) {
+    mount([header('承認待ち'),
+      el('div', { class: 'card' }, [
+        el('h2', { text: '申請を受け付けました' }),
+        el('div', { text: (me.name ? me.name + ' さん、' : '') + '承認されるまでお待ちください。' }),
+        el('div', { class: 'sub', text: '承認されたら、このメニューをもう一度開いてください。' })]),
+      el('button', { class: 'big', onclick: function () { busy('確認しています…'); call('me').then(function (r) { route(r); }); } }, ['承認されたか確認する']), footer()]);
+  }
+
+  /* ---------- ホーム ---------- */
+  function screenHome() {
+    var nodes = [header('入退院登録')];
+    nodes.push(el('button', { class: 'big primary', onclick: screenNyuin }, [el('span', { text: '入院を登録' }), el('small', { text: '入院の連絡' })]));
+    nodes.push(el('button', { class: 'big', onclick: screenActive }, [el('span', { text: '退院を登録' }), el('small', { text: '入院中の方から選ぶ' })]));
+    if (isOffice()) nodes.push(el('button', { class: 'big', onclick: screenInbox }, [el('span', { text: '未処理の一覧' }), el('small', { text: 'Excel に未取込' })]));
+    nodes.push(footer());
+    mount(nodes);
+  }
+
+  /* ---------- 名簿 ---------- */
+  function loadMaster() {
+    if (state.master) return Promise.resolve(state.master);
+    var cached = null;
+    try { cached = JSON.parse(localStorage.getItem('master_v1') || 'null'); } catch (e) { }
+    return call('master', { ver: cached && cached.ver }).then(function (r) {
+      if (!r || r.ok === false) throw new Error((r && r.message) || '名簿を読み込めませんでした');
+      var data = r.same && cached ? cached : { ver: r.ver, rows: r.rows };
+      if (!r.same) { try { localStorage.setItem('master_v1', JSON.stringify(data)); } catch (e) { } }
+      state.master = data;
+      state.index = data.rows.map(function (row) {
+        return { row: row, text: norm(row[1] + row[2] + row[0] + row[3]), name: norm(row[1]), kana: norm(row[2]) };
+      });
+      return data;
+    }).catch(function (e) {
+      if (cached) { state.master = cached; state.index = cached.rows.map(function (row) { return { row: row, text: norm(row[1] + row[2] + row[0] + row[3]), name: norm(row[1]), kana: norm(row[2]) }; }); return cached; }
+      throw e;
+    });
+  }
+
+  function search(q) {
+    var toks = String(q || '').normalize('NFKC').split(/[\s　]+/).filter(Boolean).map(norm);
+    if (!toks.length) return [];
+    var me = state.me && state.me.name;
+    var hits = [];
+    state.index.forEach(function (x) {
+      for (var i = 0; i < toks.length; i++) if (x.text.indexOf(toks[i]) < 0) return;
+      var score = 0;
+      if (x.name.indexOf(toks[0]) === 0 || x.kana.indexOf(toks[0]) === 0) score -= 2;
+      if (x.row[5] === me) score -= 1;
+      hits.push({ x: x, score: score });
+    });
+    hits.sort(function (a, b) { return a.score - b.score; });
+    return hits.slice(0, 30).map(function (h) { return h.x.row; });
+  }
+
+  /* ---------- 入院を登録 ---------- */
+  function screenNyuin() {
+    var form = { rid: rid(), picked: null, manual: false, date: shift(0), note: '', key: '', name: '', jigyosho: '', cm: '' };
+    busy('名簿を読み込んでいます…');
+    loadMaster().then(function () { drawNyuin(form, ''); }).catch(function (e) {
+      mount([header('入院を登録'), el('div', { class: 'msg err', text: e.message }), el('button', { class: 'big', onclick: screenHome }, ['戻る'])]);
+    });
+  }
+
+  function dateField(form, onchange) {
+    var inp = el('input', { type: 'date', value: toIso(form.date), max: toIso(shift(0)) });
+    var chips = [['今日', 0], ['昨日', -1], ['一昨日', -2]].map(function (p) {
+      return el('button', { class: 'chip' + (form.date === shift(p[1]) ? ' on' : ''), type: 'button', onclick: function () {
+        form.date = shift(p[1]); inp.value = toIso(form.date);
+        chips.forEach(function (c, i) { c.className = 'chip' + (form.date === shift([0, -1, -2][i]) ? ' on' : ''); });
+        if (onchange) onchange();
+      } }, [p[0]]);
+    });
+    inp.addEventListener('change', function () {
+      form.date = inp.value ? fromIso(inp.value) : form.date;
+      chips.forEach(function (c, i) { c.className = 'chip' + (form.date === shift([0, -1, -2][i]) ? ' on' : ''); });
+      if (onchange) onchange();
+    });
+    return [el('div', { class: 'row', style: 'margin-bottom:8px' }, chips), inp];
+  }
+
+  function drawNyuin(form, query) {
+    var box = el('div');
+    var results = el('div');
+    var search_ = el('input', { type: 'search', placeholder: '名前・かな・契約番号・事業所', value: query || '', autocomplete: 'off', inputmode: 'search' });
+    var nodes = [header('入院を登録')];
+
+    if (!form.manual) {
+      if (form.picked) {
+        var r = form.picked;
+        nodes.push(el('div', { class: 'card sel' }, [
+          el('div', { class: 'n', text: r[1] + ' 様' }),
+          el('div', { class: 'm sub', text: r[3] + '　契約番号 ' + r[0] }),
+          el('button', { class: 'link', onclick: function () { form.picked = null; drawNyuin(form, ''); } }, ['選び直す'])]));
+      } else {
+        nodes.push(el('div', { class: 'card' }, [
+          el('label', { class: 'f', style: 'margin-top:0', text: '利用者をさがす' }), search_, results,
+          el('button', { class: 'link', onclick: function () { form.manual = true; drawNyuin(form, ''); } }, ['名簿に無い方はこちら'])]));
+        search_.addEventListener('input', function () { renderResults(); });
+        renderResults();
+      }
+    } else {
+      var kInp = el('input', { type: 'text', inputmode: 'numeric', placeholder: '分かれば（数字）', value: form.key });
+      var nInp = el('input', { type: 'text', placeholder: '例：山田　花子', value: form.name });
+      var jInp = el('input', { type: 'text', placeholder: '居宅介護支援事業所など', value: form.jigyosho });
+      var cInp = el('input', { type: 'text', placeholder: 'ケアマネジャー名', value: form.cm });
+      [[kInp, 'key'], [nInp, 'name'], [jInp, 'jigyosho'], [cInp, 'cm']].forEach(function (p) { p[0].addEventListener('input', function () { form[p[1]] = p[0].value; }); });
+      nodes.push(el('div', { class: 'card' }, [
+        el('h2', { text: '名簿に無い方' }),
+        el('label', { class: 'f', text: '利用者名（必須）' }), nInp,
+        el('label', { class: 'f', text: '契約番号' }), kInp,
+        el('label', { class: 'f', text: '事業所名' }), jInp,
+        el('label', { class: 'f', text: 'ケアマネジャー' }), cInp,
+        el('button', { class: 'link', onclick: function () { form.manual = false; drawNyuin(form, ''); } }, ['名簿からさがす'])]));
+    }
+
+    var dateBox = el('div', { class: 'card' }, [el('label', { class: 'f', style: 'margin-top:0', text: '入院日' })].concat(dateField(form)));
+    var note = el('textarea', { placeholder: '例：自宅で転倒、○○病院に入院', maxlength: '500' });
+    note.value = form.note;
+    note.addEventListener('input', function () { form.note = note.value; });
+    var noteBox = el('div', { class: 'card' }, [el('label', { class: 'f', style: 'margin-top:0', text: '連絡事項（任意）' }), note]);
+    var err = el('div');
+    nodes.push(dateBox, noteBox, err);
+
+    nodes.push(bar([
+      el('button', { onclick: screenHome }, ['やめる']),
+      el('button', { class: 'primary', onclick: function () {
+        err.textContent = ''; err.className = '';
+        var v = readNyuin(form);
+        if (v.error) { err.className = 'msg err'; err.textContent = v.error; return; }
+        confirmNyuin(form, v);
+      } }, ['確認する'])]));
+    nodes.push(footer());
+    mount(nodes);
+
+    function renderResults() {
+      results.textContent = '';
+      var q = search_.value;
+      if (!q.trim()) { results.appendChild(el('div', { class: 'sub', style: 'padding:8px 0', text: '名前（ひらがなでも可）か契約番号を入れてください' })); return; }
+      var rows = search(q);
+      if (!rows.length) { results.appendChild(el('div', { class: 'sub', style: 'padding:8px 0', text: '見つかりません。「名簿に無い方」から入力できます。' })); return; }
+      rows.forEach(function (row) {
+        results.appendChild(el('button', { class: 'item', type: 'button', onclick: function () { form.picked = row; drawNyuin(form, ''); } }, [
+          el('div', { class: 'n' }, [row[1], row[5] === (state.me && state.me.name) ? el('span', { class: 'badge', text: '担当' }) : null]),
+          el('div', { class: 'm', text: (row[3] || '事業所不明') + '　No.' + row[0] })]));
+      });
+    }
+  }
+
+  function readNyuin(form) {
+    var v = { rid: form.rid, date: form.date, note: (form.note || '').trim(), manual: form.manual };
+    if (form.manual) {
+      v.name = (form.name || '').trim(); v.key = (form.key || '').trim().normalize('NFKC'); v.jigyosho = (form.jigyosho || '').trim(); v.cm = (form.cm || '').trim();
+      if (!v.name) return { error: '利用者名を入力してください' };
+      if (v.key && !/^\d{1,15}$/.test(v.key)) return { error: '契約番号は数字で入力してください' };
+    } else {
+      if (!form.picked) return { error: '利用者を選んでください' };
+      v.key = form.picked[0]; v.name = form.picked[1]; v.jigyosho = form.picked[3]; v.cm = form.picked[4];
+    }
+    if (!form.date) return { error: '入院日を入れてください' };
+    return v;
+  }
+
+  function confirmNyuin(form, v) {
+    var err = el('div');
+    var send = el('button', { class: 'primary', onclick: function () {
+      send.disabled = true; send.textContent = '送信しています…';
+      call('submit', v).then(function (r) {
+        if (r.ok) return doneNyuin(v, r);
+        send.disabled = false; send.textContent = '登録する';
+        if (r.code === 'exists' && r.master) {
+          err.className = 'msg warn';
+          err.textContent = '契約番号 ' + v.key + ' は名簿の「' + r.master[1] + '」様です。この方でよければ名簿から選び直してください。違う場合は契約番号を確かめてください。';
+          return;
+        }
+        err.className = 'msg err'; err.textContent = r.message || '登録できませんでした。もう一度お試しください';
+      });
+    } }, ['登録する']);
+    mount([header('登録の確認'),
+      el('div', { class: 'card' }, [
+        el('dl', { class: 'kv' }, [
+          el('dt', { text: '利用者' }), el('dd', { text: v.name + ' 様' }),
+          el('dt', { text: '事業所' }), el('dd', { text: v.jigyosho || '（なし）' }),
+          el('dt', { text: '契約番号' }), el('dd', { text: v.key || '（なし）' }),
+          el('dt', { text: '入院日' }), el('dd', { text: v.date }),
+          v.note ? el('dt', { text: '連絡事項' }) : null, v.note ? el('dd', { text: v.note }) : null])]),
+      el('div', { class: 'msg warn', text: '登録すると事務に LINE で通知されます。間違いがないか確かめてください。' }),
+      err,
+      bar([el('button', { onclick: function () { drawNyuin(form, ''); } }, ['戻る']), send]), footer()]);
+  }
+
+  function doneNyuin(v, r) {
+    var undo = el('button', { class: 'link', onclick: function () {
+      undo.disabled = true;
+      call('cancel', { id: r.id }).then(function (c) {
+        if (c.ok) { msg.className = 'msg warn'; msg.textContent = '取り消しました。'; undo.hidden = true; }
+        else { msg.className = 'msg err'; msg.textContent = c.message || '取り消せませんでした'; undo.disabled = false; }
+      });
+    } }, ['間違えたので取り消す']);
+    var msg = el('div', { class: 'msg ok', text: r.dup ? 'すでに登録されています。' : '登録しました。事務に通知しました。' });
+    mount([header('登録しました'), msg,
+      el('div', { class: 'card' }, [el('div', { class: 'n', text: v.name + ' 様' }), el('div', { class: 'sub', text: '入院日 ' + v.date })]),
+      undo,
+      el('button', { class: 'big primary', onclick: screenNyuin }, ['続けて入院を登録']),
+      el('button', { class: 'big', onclick: screenHome }, ['ホームへ']),
+      (!CFG.MOCK && window.liff && liff.isInClient && liff.isInClient()) ? el('button', { class: 'big', onclick: function () { liff.closeWindow(); } }, ['閉じる']) : null,
+      footer()]);
+  }
+
+  /* ---------- 入院中の方（退院の登録） ---------- */
+  function screenActive() {
+    busy('入院中の方を読み込んでいます…');
+    call('active').then(function (r) {
+      if (!r || r.ok === false) return mount([header('入院中の方'), el('div', { class: 'msg err', text: (r && r.message) || '読み込めませんでした' }), el('button', { class: 'big', onclick: screenHome }, ['戻る'])]);
+      var nodes = [header(r.office ? '入院中の方（全員）' : '入院中の方')];
+      if (!r.items.length) nodes.push(el('div', { class: 'card sub', text: '入院中の方はいません。' }));
+      else nodes.push(el('div', { class: 'sub', text: '退院した方をタップして、退院日を登録します。' }));
+      r.items.forEach(function (it) {
+        nodes.push(el('button', { class: 'item', type: 'button', onclick: function () { screenDischarge(it); } }, [
+          el('div', { class: 'n' }, [it.name, it.days >= 30 ? el('span', { class: 'badge warn', text: it.days + '日目' }) : el('span', { class: 'badge gray', text: it.days + '日目' })]),
+          el('div', { class: 'm', text: (it.jigyosho || '') + '　入院 ' + shortDate(it.nyuin) + (r.office ? '　担当 ' + it.tanto : '') })]));
+      });
+      nodes.push(bar([el('button', { onclick: screenHome }, ['ホーム'])]), footer());
+      mount(nodes);
+    });
+  }
+
+  function screenDischarge(it) {
+    var form = { date: shift(0), memo: '' };
+    var memo = el('textarea', { placeholder: '例：自宅に戻られた／施設に入所', maxlength: '500' });
+    memo.addEventListener('input', function () { form.memo = memo.value; });
+    var err = el('div');
+    var send = el('button', { class: 'primary', onclick: function () {
+      err.textContent = ''; err.className = '';
+      if (form.date < it.nyuin) { err.className = 'msg err'; err.textContent = '退院日が入院日（' + it.nyuin + '）より前になっています'; return; }
+      send.disabled = true; send.textContent = '送信しています…';
+      call('discharge', { id: it.id, date: form.date, memo: form.memo.trim() }).then(function (r) {
+        if (r.ok) return mount([header('登録しました'), el('div', { class: 'msg ok', text: '退院を登録しました。' }),
+          el('div', { class: 'card' }, [el('div', { class: 'n', text: it.name + ' 様' }), el('div', { class: 'sub', text: '退院日 ' + form.date })]),
+          el('button', { class: 'big primary', onclick: screenActive }, ['入院中の一覧へ']), el('button', { class: 'big', onclick: screenHome }, ['ホームへ']), footer()]);
+        send.disabled = false; send.textContent = '登録する';
+        err.className = 'msg err'; err.textContent = r.message || '登録できませんでした';
+      });
+    } }, ['登録する']);
+    mount([header('退院を登録'),
+      el('div', { class: 'card sel' }, [el('div', { class: 'n', text: it.name + ' 様' }), el('div', { class: 'm sub', text: (it.jigyosho || '') + '　入院 ' + it.nyuin })]),
+      el('div', { class: 'card' }, [el('label', { class: 'f', style: 'margin-top:0', text: '退院日' })].concat(dateField(form))),
+      el('div', { class: 'card' }, [el('label', { class: 'f', style: 'margin-top:0', text: '連絡事項（任意）' }), memo]),
+      err, bar([el('button', { onclick: screenActive }, ['戻る']), send]), footer()]);
+  }
+
+  /* ---------- 未処理の一覧（事務） ---------- */
+  function screenInbox() {
+    busy('読み込んでいます…');
+    call('inbox').then(function (r) {
+      if (!r || r.ok === false) return mount([header('未処理の一覧'), el('div', { class: 'msg err', text: (r && r.message) || '読み込めませんでした' }), el('button', { class: 'big', onclick: screenHome }, ['戻る'])]);
+      var nodes = [header('未処理の一覧')];
+      nodes.push(el('div', { class: 'card' }, [el('h2', { text: 'Excel にまだ取り込んでいない（' + r.pending.length + '件）' }),
+        el('div', { class: 'sub', text: '入退院取込.xlsm を開くと取り込めます。' })]));
+      r.pending.forEach(function (it) { nodes.push(inboxItem(it)); });
+      if (r.recent.length) {
+        nodes.push(el('h2', { style: 'font-size:15px;margin:22px 0 4px', text: '最近取り込んだもの' }));
+        r.recent.forEach(function (it) { nodes.push(inboxItem(it)); });
+      }
+      nodes.push(bar([el('button', { onclick: screenHome }, ['ホーム']), el('button', { onclick: screenInbox }, ['更新'])]), footer());
+      mount(nodes);
+    });
+  }
+  function inboxItem(it) {
+    var out = it.state === '退院済';
+    return el('div', { class: 'item' }, [
+      el('div', { class: 'n' }, [it.name, el('span', { class: 'badge' + (out ? ' gray' : ''), text: out ? '退院' : '入院' })]),
+      el('div', { class: 'm', text: (it.jigyosho || '') + '　' + (out ? '退院 ' + shortDate(it.taiin) : '入院 ' + shortDate(it.nyuin)) + '　担当 ' + it.tanto + (it.note ? '　' + it.note : '') })]);
+  }
+
+  window.__app = { start: start, state: state, setApi: function (f) { api = f; }, setIdToken: function (t) { state.idToken = t; } };
+  // 2つ目の <script>（試験用の偽の窓口）が読み込まれてから始める
+  document.addEventListener('DOMContentLoaded', start);
+})();
+</script>
+</body>
+</html>
