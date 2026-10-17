@@ -173,10 +173,44 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
         api = realApi();
       });
     }
-    p.then(function () { return call('me'); }).then(function (me) {
-      if (!me || me.ok === false) return fatal(me && me.message);
-      route(me);
+    p.then(function () {
+      // 前回「使える」と確かめた本人なら、その情報ですぐ画面を出し、確認は裏で（役割や状態が変わっていたら出し直す）
+      var cachedMe = readMe();
+      if (cachedMe) {
+        route(cachedMe);
+        call('me').then(function (me) {
+          if (!me || me.ok === false) return;
+          saveMe(me);
+          if (me.status !== cachedMe.status || me.role !== cachedMe.role) return route(me);
+          if (state.me) state.me.name = me.name;
+        });
+        return;
+      }
+      return call('me').then(function (me) {
+        if (!me || me.ok === false) return fatal(me && me.message);
+        saveMe(me);
+        route(me);
+      });
     }).catch(function (e) { fatal(e && e.message); });
+  }
+
+  // 本人の情報の保存（「使える」状態のときだけ。LINE の利用者IDが同じときだけ使う）
+  function currentSub() {
+    if (CFG.MOCK) return 'mock';
+    try { return (liff.getDecodedIDToken() || {}).sub || ''; } catch (e) { return ''; }
+  }
+  function readMe() {
+    try {
+      var c = JSON.parse(localStorage.getItem('me_v1') || 'null');
+      var sub = currentSub();
+      return c && sub && c.sub === sub && c.me && c.me.status === 'ok' ? c.me : null;
+    } catch (e) { return null; }
+  }
+  function saveMe(me) {
+    try {
+      if (me && me.status === 'ok') localStorage.setItem('me_v1', JSON.stringify({ sub: currentSub(), me: { ok: true, status: 'ok', name: me.name, role: me.role } }));
+      else localStorage.removeItem('me_v1');
+    } catch (e) { }
   }
 
   function loadLiff() {
@@ -199,6 +233,7 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
     if (me.status === 'pending') { state.me = null; return screenPending(me); }
     if (me.status !== 'ok') { state.me = null; return mount([header('入退院登録'), el('div', { class: 'msg err', text: 'この LINE では利用できません。事務に連絡してください。' }), footer()]); }
     state.me = { name: me.name, role: me.role };
+    loadMaster().catch(function () { });     // 先に名簿を用意しておく（保存分があれば一瞬）
     var q = new URLSearchParams(location.search);
     var v = q.get('view');
     var st = q.get('liff.state');
@@ -258,24 +293,79 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
     mount(nodes);
   }
 
-  /* ---------- 名簿 ---------- */
-  function loadMaster() {
-    if (state.master) return Promise.resolve(state.master);
-    var cached = null;
-    try { cached = JSON.parse(localStorage.getItem('master_v1') || 'null'); } catch (e) { }
+  /* ---------- 名簿 ----------
+   * 名簿はスマホに保存しておき、開いたらすぐそれを使う（窓口の返事を待たない）。
+   * 新しくするのは平日に1日1回：朝 8:50＋端末ごとの0〜19分（全員が同時に読みに行かないように）を過ぎてから
+   * 最初に開いたとき、画面はそのまま裏で読み直す。土日は読み直さない（金曜の分を使う）。
+   * LINE の画面は開いている間しか動けないので、閉じている間に読み込むことはできない。
+   * 名簿が変わっていなければ窓口は「同じ」とだけ返す（名簿そのものは送られない）。 */
+  var MASTER_KEY = 'master_v1';
+  var REFRESH_AT = [8, 50];      // 平日のこの時刻から
+  var REFRESH_SPREAD = 20;       // この分数の間で端末ごとにずらす
+
+  function refreshSlot() {
+    var m = NaN;
+    try { m = Number(localStorage.getItem('master_slot')); } catch (e) { }
+    if (!(m >= 0 && m < REFRESH_SPREAD) || Math.floor(m) !== m) {
+      m = Math.floor(Math.random() * REFRESH_SPREAD);
+      try { localStorage.setItem('master_slot', String(m)); } catch (e) { }
+    }
+    return m;
+  }
+
+  // now（ミリ秒）以前で一番新しい「読み直しの区切り」（平日 8:50＋ずらし）
+  function lastBoundary(now) {
+    var slot = refreshSlot();
+    var d = new Date(now);
+    for (var i = 0; i < 8; i++) {
+      var b = new Date(d.getFullYear(), d.getMonth(), d.getDate() - i, REFRESH_AT[0], REFRESH_AT[1] + slot, 0, 0);
+      var wd = b.getDay();
+      if (wd === 0 || wd === 6) continue;
+      if (b.getTime() <= now) return b.getTime();
+    }
+    return 0;
+  }
+
+  function masterStale(cached, now) {
+    return !cached || !cached.at || cached.at < lastBoundary(now);
+  }
+
+  function readMaster() {
+    try {
+      var c = JSON.parse(localStorage.getItem(MASTER_KEY) || 'null');
+      return c && c.ver && c.rows && c.rows.length ? c : null;
+    } catch (e) { return null; }
+  }
+
+  function useMaster(data) {
+    state.master = data;
+    state.index = data.rows.map(function (row) {
+      return { row: row, text: norm(row[1] + row[2] + row[0] + row[3]), name: norm(row[1]), kana: norm(row[2]) };
+    });
+  }
+
+  function fetchMaster(cached) {
     return call('master', { ver: cached && cached.ver }).then(function (r) {
       if (!r || r.ok === false) throw new Error((r && r.message) || '名簿を読み込めませんでした');
-      var data = r.same && cached ? cached : { ver: r.ver, rows: r.rows };
-      if (!r.same) { try { localStorage.setItem('master_v1', JSON.stringify(data)); } catch (e) { } }
-      state.master = data;
-      state.index = data.rows.map(function (row) {
-        return { row: row, text: norm(row[1] + row[2] + row[0] + row[3]), name: norm(row[1]), kana: norm(row[2]) };
-      });
+      var data = r.same && cached ? { ver: cached.ver, rows: cached.rows } : { ver: r.ver, rows: r.rows };
+      data.at = Date.now();
+      try { localStorage.setItem(MASTER_KEY, JSON.stringify(data)); } catch (e) { }
+      useMaster(data);
       return data;
-    }).catch(function (e) {
-      if (cached) { state.master = cached; state.index = cached.rows.map(function (row) { return { row: row, text: norm(row[1] + row[2] + row[0] + row[3]), name: norm(row[1]), kana: norm(row[2]) }; }); return cached; }
-      throw e;
     });
+  }
+
+  function loadMaster() {
+    if (state.masterP) return state.masterP;
+    var cached = readMaster();
+    if (cached) {
+      useMaster(cached);
+      if (masterStale(cached, Date.now())) fetchMaster(cached).catch(function () { });   // 裏で。失敗しても保存分で続ける
+      state.masterP = Promise.resolve(cached);
+    } else {
+      state.masterP = fetchMaster(null).catch(function (e) { state.masterP = null; throw e; });
+    }
+    return state.masterP;
   }
 
   function search(q) {
@@ -514,7 +604,8 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
       el('div', { class: 'm', text: (it.jigyosho || '') + '　' + (out ? '退院 ' + shortDate(it.taiin) : '入院 ' + shortDate(it.nyuin)) + '　担当 ' + it.tanto + (it.note ? '　' + it.note : '') })]);
   }
 
-  window.__app = { start: start, state: state, setApi: function (f) { api = f; }, setIdToken: function (t) { state.idToken = t; } };
+  window.__app = { start: start, state: state, setApi: function (f) { api = f; }, setIdToken: function (t) { state.idToken = t; },
+                   lastBoundary: lastBoundary, masterStale: masterStale };
   // 2つ目の <script>（試験用の偽の窓口）が読み込まれてから始める
   document.addEventListener('DOMContentLoaded', start);
 })();
