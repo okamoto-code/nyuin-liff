@@ -299,7 +299,10 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
    * 最初に開いたとき、画面はそのまま裏で読み直す。土日は読み直さない（金曜の分を使う）。
    * LINE の画面は開いている間しか動けないので、閉じている間に読み込むことはできない。
    * 名簿が変わっていなければ窓口は「同じ」とだけ返す（名簿そのものは送られない）。 */
-  var MASTER_KEY = 'master_v1';
+  // 保存の名前を変えると、どのスマホも次に開いたとき1回だけ名簿を読み直す（保存分が無い扱いになる）。
+  // 10/21 名簿の整理（レンタル終了 1,336人を外した）をすぐ見せるため v1 → v2 にした。古い保存分は消す
+  var MASTER_KEY = 'master_v2';
+  try { localStorage.removeItem('master_v1'); } catch (e) { }
   var REFRESH_AT = [8, 50];      // 平日のこの時刻から
   var REFRESH_SPREAD = 20;       // この分数の間で端末ごとにずらす
 
