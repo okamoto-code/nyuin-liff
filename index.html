@@ -81,6 +81,9 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
   'use strict';
   var CFG = window.APP_CONFIG || {};
   var VERSION = 'v1.0';
+  // 試験用の画面（GitHub Pages の test/、LIFF も別）。本番の画面と同じ置き場所なので、スマホに保存する名前を分ける
+  var TEST_SCREEN = !CFG.MOCK && CFG.ENV === 'test';
+  var KP = TEST_SCREEN ? 'test_' : '';
   var app = document.getElementById('app');
 
   /* ---------- 小さな道具 ---------- */
@@ -165,6 +168,12 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
       document.getElementById('mockbar').hidden = false;
       p = window.__mockInit();
     } else {
+      if (TEST_SCREEN) {
+        var tb = document.getElementById('mockbar');
+        tb.textContent = '試験用の画面です（本番の記録・Excel には入りません）';
+        tb.hidden = false;
+        document.title = '入退院登録（試験）';
+      }
       p = loadLiff().then(function () {
         return liff.init({ liffId: CFG.LIFF_ID });
       }).then(function () {
@@ -201,15 +210,15 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
   }
   function readMe() {
     try {
-      var c = JSON.parse(localStorage.getItem('me_v1') || 'null');
+      var c = JSON.parse(localStorage.getItem(KP + 'me_v1') || 'null');
       var sub = currentSub();
       return c && sub && c.sub === sub && c.me && c.me.status === 'ok' ? c.me : null;
     } catch (e) { return null; }
   }
   function saveMe(me) {
     try {
-      if (me && me.status === 'ok') localStorage.setItem('me_v1', JSON.stringify({ sub: currentSub(), me: { ok: true, status: 'ok', name: me.name, role: me.role } }));
-      else localStorage.removeItem('me_v1');
+      if (me && me.status === 'ok') localStorage.setItem(KP + 'me_v1', JSON.stringify({ sub: currentSub(), me: { ok: true, status: 'ok', name: me.name, role: me.role } }));
+      else localStorage.removeItem(KP + 'me_v1');
     } catch (e) { }
   }
 
@@ -301,7 +310,7 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
    * 名簿が変わっていなければ窓口は「同じ」とだけ返す（名簿そのものは送られない）。 */
   // 保存の名前を変えると、どのスマホも次に開いたとき1回だけ名簿を読み直す（保存分が無い扱いになる）。
   // 10/21 名簿の整理（レンタル終了 1,336人を外した）をすぐ見せるため v1 → v2 にした。古い保存分は消す
-  var MASTER_KEY = 'master_v2';
+  var MASTER_KEY = KP + 'master_v2';
   try { localStorage.removeItem('master_v1'); } catch (e) { }
   var REFRESH_AT = [8, 50];      // 平日のこの時刻から
   var REFRESH_SPREAD = 20;       // この分数の間で端末ごとにずらす
