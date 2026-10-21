@@ -258,8 +258,8 @@ footer { color: var(--sub); font-size: 12px; text-align: center; margin: 24px 0;
     mount([header('はじめての方'),
       el('div', { class: 'card' }, [
         el('h2', { text: '利用の申請' }),
-        el('div', { class: 'sub', text: 'お名前を入力して申請してください。承認されると使えるようになります。' }),
-        el('label', { class: 'f', text: 'お名前（姓だけで構いません）' }), name,
+        el('div', { class: 'sub', text: '名字を入力して申請してください。Excel の「担当」欄に入ります。承認されると使えるようになります。' }),
+        el('label', { class: 'f', text: '名字（例：三木）' }), name,
         el('label', { class: 'f', text: '区分' }), el('div', { class: 'row' }, chips),
         err]),
       bar([el('button', { class: 'primary', onclick: function (ev) {
